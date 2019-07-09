@@ -10,7 +10,7 @@ environment:
   AWS_SECRET_ACCESS_KEY:
     secure: jeVYQ02OTywaENrIcWvoZg+YzGnhiluCDes/kaJE4NeVIZqjlipFt5yXxCct9S5w
   PYPI_PASSWORD:
-    secure: ZuRCW1W45pqH03Lio54BzQ==
+    secure: iwHCe7zJP1fu+Jv03MC+ArVwcbANHouo7xvXkJvqXPQ=
 
 clone_depth: 3
 
