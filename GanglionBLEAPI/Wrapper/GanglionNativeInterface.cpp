@@ -86,7 +86,7 @@ namespace GanglionLibNative
             return nullptr;
         }
 
-        int initialize (LPVOID param)
+        int initialize (void *param)
     {
         if (!is_initialized)
         {
@@ -107,38 +107,38 @@ namespace GanglionLibNative
         return (int)CustomExitCodesNative::STATUS_OK;
     }
 
-    int open_ganglion_native (LPVOID param)
+    int open_ganglion_native (void *param)
     {
         Ganglion ^ wrapper = GanglionLibWrapper::instance->ganglion_obj;
         return wrapper->open_ganglion ();
     }
 
-    int open_ganglion_mac_addr_native (LPVOID param)
+    int open_ganglion_mac_addr_native (void *param)
     {
         Ganglion ^ wrapper = GanglionLibWrapper::instance->ganglion_obj;
         String ^ mac_new = gcnew String ((char *)param);
         return wrapper->open_ganglion (mac_new);
     }
 
-    int close_ganglion_native (LPVOID param)
+    int close_ganglion_native (void *param)
     {
         Ganglion ^ wrapper = GanglionLibWrapper::instance->ganglion_obj;
         return wrapper->close_ganglion ();
     }
 
-    int start_stream_native (LPVOID param)
+    int start_stream_native (void *param)
     {
         Ganglion ^ wrapper = GanglionLibWrapper::instance->ganglion_obj;
         return wrapper->start_stream ();
     }
 
-    int stop_stream_native (LPVOID param)
+    int stop_stream_native (void *param)
     {
         Ganglion ^ wrapper = GanglionLibWrapper::instance->ganglion_obj;
         return wrapper->stop_stream ();
     }
 
-    int get_data_native (LPVOID param)
+    int get_data_native (void *param)
     {
         Ganglion ^ wrapper = GanglionLibWrapper::instance->ganglion_obj;
         BoardData ^ managedData = wrapper->get_data ();

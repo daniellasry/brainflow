@@ -48,7 +48,8 @@ namespace GanglionLibNative
         FAILED_TO_SET_CALLBACK_ERROR,
         FAILED_TO_UNSUBSCRIBE_ERROR,
         GENERAL_ERROR,
-        NO_DATA_ERROR
+        NO_DATA_ERROR,
+        SYNC_ERROR
     };
 
 #ifdef __cplusplus
