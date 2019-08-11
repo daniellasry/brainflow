@@ -57,7 +57,7 @@ if (CMAKE_SIZEOF_VOID_P EQUAL 8)
     if(APPLE)
         SET (COMPILED_FILE_NAME "libBoardController.dylib")
     elseif (UNIX)
-    	SET (GANGLION_LIB_PATH "${CMAKE_HOME_DIRECTORY}/GanglionBLEAPI/GanglionLibrary.so)
+    	SET (GANGLION_LIB_PATH "${CMAKE_HOME_DIRECTORY}/GanglionBLEAPI/GanglionLibrary.so")
     	SET (GANGLION_LIB_NAME "GanglionLibrary.so")
         SET (COMPILED_FILE_NAME "libBoardController.so")
     else ()
@@ -233,6 +233,13 @@ if (MSVC)
         DESTINATION lib
     )
 endif (MSVC)
+if (UNIX)
+    install (
+        FILES
+        "${GANGLION_LIB_PATH}"
+        DESTINATION lib
+    )
+endif (UNIX)
 
 install (
     FILES "${project_config}" "${version_config}"

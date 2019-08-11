@@ -25,9 +25,14 @@ Ganglion::Ganglion (const char *port_name) : Board ()
     }
     else
     {
+#ifdef _WIN32
         strcpy (this->mac_addr, port_name);
+#else
+        strcpy (this->input_string, port_name);
+#endif
         this->use_mac_addr = true;
     }
+
     // get full path of ganglioblibnative with assumption that this lib is in the same folder
     char ganglionlib_dir[1024];
     bool res = get_dll_path (ganglionlib_dir);
@@ -47,12 +52,16 @@ Ganglion::Ganglion (const char *port_name) : Board ()
         else
             ganglioblib_path = "GanglionLibNative32.dll";
     }
-    Board::board_logger->debug ("use dll: {}", ganglioblib_path.c_str ());
-    dll_loader = new DLLLoader (ganglioblib_path.c_str ());
 #else
-    // temp unimplemented
-    dll_loader = NULL;
+    // only 64 bit for unix
+    if (res)
+        ganglioblib_path = std::string (ganglionlib_dir) + "GanglionLibrary.so";
+    else
+        ganglioblib_path = "GanglionLibrary.so";
 #endif
+    Board::board_logger->debug ("use dyn lib: {}", ganglioblib_path.c_str ());
+    dll_loader = new DLLLoader (ganglioblib_path.c_str ());
+
     this->is_streaming = false;
     this->keep_alive = false;
     this->initialized = false;
@@ -72,6 +81,27 @@ int Ganglion::prepare_session ()
         Board::board_logger->info ("Session is already prepared");
         return STATUS_OK;
     }
+
+#ifndef _WIN32
+    if (!this->use_mac_addr)
+    {
+        Board::board_logger->error ("auto discovery for ganglion is not supported on UNIX");
+        return INVALID_ARGUMENTS_ERROR;
+    }
+    std::string input_string = this->input_string;
+    size_t comma_pos = input_string.find_first_of (",");
+    if ((comma_pos == std::string::npos) || (comma_pos == input_string.length ()))
+    {
+        Board::board_logger->error ("invalid format for port_name, for UNIX you need dongle and "
+                                    "pass port name like 'port_name,mac_addr'");
+        return INVALID_ARGUMENTS_ERROR;
+    }
+    std::string str_port = input_string.substr (0, comma_pos);
+    std::string str_mac = input_string.substr (comma_pos + 1);
+    strcpy (this->mac_addr, str_mac.c_str ());
+    strcpy (this->dongle_port, str_port.c_str ());
+    Board::board_logger->info ("use port {} and mac addr {}", this->dongle_port, this->mac_addr);
+#endif
 
     if (!this->dll_loader->load_library ())
     {
@@ -399,7 +429,11 @@ int Ganglion::call_init ()
         Board::board_logger->error ("failed to get function address for initialize");
         return GENERAL_ERROR;
     }
+#ifdef _WIN32
     int res = (func) (NULL);
+#else
+    int res = (func) (this->dongle_port);
+#endif
     if (res != GanglionLibNative::CustomExitCodesNative::STATUS_OK)
     {
         Board::board_logger->error ("failed to init GanglionLib {}", res);
