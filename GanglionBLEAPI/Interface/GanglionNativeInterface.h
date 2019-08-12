@@ -50,7 +50,9 @@ namespace GanglionLibNative
         GENERAL_ERROR,
         NO_DATA_ERROR,
         SYNC_ERROR,
-        NOT_IMPLEMENTED_ERROR
+        NOT_IMPLEMENTED_ERROR,
+        INVALID_MAC_ADDR_ERROR,
+        PORT_OPEN_ERROR
     };
 
 #ifdef __cplusplus

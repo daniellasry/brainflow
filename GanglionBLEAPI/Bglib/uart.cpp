@@ -31,135 +31,126 @@
 #define snprintf _snprintf
 #endif
 
-#include <windows.h>
 #include <Setupapi.h>
+#include <windows.h>
 
 HANDLE serial_handle;
 
-void uart_list_devices()
+void uart_list_devices ()
 {
-    char name[]="Bluegiga Bluetooth Low Energy";
+    char name[] = "Bluegiga Bluetooth Low Energy";
 
-    BYTE* pbuf = NULL;
+    BYTE *pbuf = NULL;
     DWORD reqSize = 0;
-    DWORD n=0;
+    DWORD n = 0;
     HDEVINFO hDevInfo;
-    //guid for ports
-    static const GUID guid = { 0x4d36e978, 0xe325, 0x11ce, { 0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18 } };
+    // guid for ports
+    static const GUID guid = {
+        0x4d36e978, 0xe325, 0x11ce, {0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}};
     char *str;
-    char tmp[MAX_PATH+1];
+    char tmp[MAX_PATH + 1];
     int i;
     SP_DEVINFO_DATA DeviceInfoData;
 
-    snprintf(tmp,MAX_PATH,"%s (COM%%d)",name);
+    snprintf (tmp, MAX_PATH, "%s (COM%%d)", name);
 
 
-    DeviceInfoData.cbSize=sizeof(SP_DEVINFO_DATA);
-    hDevInfo = SetupDiGetClassDevs(&guid,   //Retrieve all ports
-           						   0L,
-          						   NULL,
-          						   DIGCF_PRESENT );
-    if(hDevInfo==INVALID_HANDLE_VALUE)
+    DeviceInfoData.cbSize = sizeof (SP_DEVINFO_DATA);
+    hDevInfo = SetupDiGetClassDevs (&guid, // Retrieve all ports
+        0L, NULL, DIGCF_PRESENT);
+    if (hDevInfo == INVALID_HANDLE_VALUE)
         return;
-    while(1)
+    while (1)
     {
 
-        if(!SetupDiEnumDeviceInfo(
-                hDevInfo,
-                n++,
-                &DeviceInfoData
-        ))
+        if (!SetupDiEnumDeviceInfo (hDevInfo, n++, &DeviceInfoData))
         {
-            SetupDiDestroyDeviceInfoList(hDevInfo);
+            SetupDiDestroyDeviceInfoList (hDevInfo);
             return;
         }
         reqSize = 0;
-        SetupDiGetDeviceRegistryPropertyA(hDevInfo, &DeviceInfoData, SPDRP_FRIENDLYNAME, NULL, NULL, 0, &reqSize);
-        pbuf = (BYTE*)malloc(reqSize>1?reqSize:1);
-        if (!SetupDiGetDeviceRegistryPropertyA(hDevInfo, &DeviceInfoData, SPDRP_FRIENDLYNAME, NULL, pbuf, reqSize, NULL))
+        SetupDiGetDeviceRegistryPropertyA (
+            hDevInfo, &DeviceInfoData, SPDRP_FRIENDLYNAME, NULL, NULL, 0, &reqSize);
+        pbuf = (BYTE *)malloc (reqSize > 1 ? reqSize : 1);
+        if (!SetupDiGetDeviceRegistryPropertyA (
+                hDevInfo, &DeviceInfoData, SPDRP_FRIENDLYNAME, NULL, pbuf, reqSize, NULL))
         {
-            free(pbuf);
+            free (pbuf);
             continue;
         }
-        str = (char*)pbuf;
-        if(sscanf(str,tmp,&i)==1)
+        str = (char *)pbuf;
+        if (sscanf (str, tmp, &i) == 1)
         {
 
-            printf("%s\n", str);
-            //emit DeviceFound(str,QString("\\\\.\\COM%1").arg(i));
+            printf ("%s\n", str);
+            // emit DeviceFound(str,QString("\\\\.\\COM%1").arg(i));
         }
-        free(pbuf);
+        free (pbuf);
     }
     return;
 }
 
-int uart_find_serialport(char *name)
+int uart_find_serialport (char *name)
 {
-    BYTE* pbuf = NULL;
+    BYTE *pbuf = NULL;
     DWORD reqSize = 0;
-    DWORD n=0;
+    DWORD n = 0;
     HDEVINFO hDevInfo;
-    //guid for ports
-    static const GUID guid = { 0x4d36e978, 0xe325, 0x11ce, { 0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18 } };
+    // guid for ports
+    static const GUID guid = {
+        0x4d36e978, 0xe325, 0x11ce, {0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18}};
     char *str;
-    char tmp[MAX_PATH+1];
+    char tmp[MAX_PATH + 1];
     int i;
     SP_DEVINFO_DATA DeviceInfoData;
 
-    snprintf(tmp,MAX_PATH,"%s (COM%%d)",name);
+    snprintf (tmp, MAX_PATH, "%s (COM%%d)", name);
 
 
-    DeviceInfoData.cbSize=sizeof(SP_DEVINFO_DATA);
-    hDevInfo = SetupDiGetClassDevs(&guid,   //Retrieve all ports
-            					   0L,
-           						   NULL,
-           						   DIGCF_PRESENT );
-    if(hDevInfo==INVALID_HANDLE_VALUE)
+    DeviceInfoData.cbSize = sizeof (SP_DEVINFO_DATA);
+    hDevInfo = SetupDiGetClassDevs (&guid, // Retrieve all ports
+        0L, NULL, DIGCF_PRESENT);
+    if (hDevInfo == INVALID_HANDLE_VALUE)
         return -1;
-    while(1)
+    while (1)
     {
 
-        if(!SetupDiEnumDeviceInfo(
-                hDevInfo,
-                n++,
-                &DeviceInfoData
-        ))
+        if (!SetupDiEnumDeviceInfo (hDevInfo, n++, &DeviceInfoData))
         {
-            SetupDiDestroyDeviceInfoList(hDevInfo);
+            SetupDiDestroyDeviceInfoList (hDevInfo);
             return -1;
         }
         reqSize = 0;
-        SetupDiGetDeviceRegistryPropertyA(hDevInfo, &DeviceInfoData, SPDRP_FRIENDLYNAME, NULL, NULL, 0, &reqSize);
-        pbuf = malloc(reqSize>1?reqSize:1);
-        if (!SetupDiGetDeviceRegistryPropertyA(hDevInfo, &DeviceInfoData, SPDRP_FRIENDLYNAME, NULL, pbuf, reqSize, NULL))
+        SetupDiGetDeviceRegistryPropertyA (
+            hDevInfo, &DeviceInfoData, SPDRP_FRIENDLYNAME, NULL, NULL, 0, &reqSize);
+        pbuf = malloc (reqSize > 1 ? reqSize : 1);
+        if (!SetupDiGetDeviceRegistryPropertyA (
+                hDevInfo, &DeviceInfoData, SPDRP_FRIENDLYNAME, NULL, pbuf, reqSize, NULL))
         {
-            free(pbuf);
+            free (pbuf);
             continue;
         }
-        str = (char*)pbuf;
-        if(sscanf(str,tmp,&i)==1)
+        str = (char *)pbuf;
+        if (sscanf (str, tmp, &i) == 1)
         {
-            free(pbuf);
-            SetupDiDestroyDeviceInfoList(hDevInfo);
+            free (pbuf);
+            SetupDiDestroyDeviceInfoList (hDevInfo);
             return i;
         }
-        free(pbuf);
+        free (pbuf);
     }
     return -1;
 }
 
-int uart_open(char *port)
+int uart_open (char *port)
 {
     char str[20];
 
-    snprintf(str,sizeof(str)-1,"\\\\.\\%s",port);
-    serial_handle = CreateFileA(str,
-            					GENERIC_READ | GENERIC_WRITE,
-          					    FILE_SHARE_READ|FILE_SHARE_WRITE,
-         					    NULL,
-         					    OPEN_EXISTING,
-           					    0,//FILE_FLAG_OVERLAPPED,
-          					    NULL);
+    snprintf (str, sizeof (str) - 1, "\\\\.\\%s", port);
+    serial_handle = CreateFileA (str, GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+        0, // FILE_FLAG_OVERLAPPED,
+        NULL);
 
 
     if (serial_handle == INVALID_HANDLE_VALUE)
@@ -169,70 +160,58 @@ int uart_open(char *port)
 
     return 0;
 }
-void uart_close()
+void uart_close ()
 {
-    CloseHandle(serial_handle);
+    CloseHandle (serial_handle);
 }
 
-int uart_tx(int len,unsigned char *data)
+int uart_tx (int len, unsigned char *data)
 {
-    DWORD r,written;
-    while(len)
+    DWORD r, written;
+    while (len)
     {
 
-        r=WriteFile (serial_handle,
-                data,
-                len,
-                &written,
-                NULL
-        );
-        if(!r)
+        r = WriteFile (serial_handle, data, len, &written, NULL);
+        if (!r)
         {
             return -1;
         }
-        len-=written;
-        data+=len;
+        len -= written;
+        data += len;
     }
 
     return 0;
 }
-int uart_rx(int len,unsigned char *data,int timeout_ms)
+int uart_rx (int len, unsigned char *data, int timeout_ms)
 {
-    int l=len;
-    DWORD r,rread;
+    int l = len;
+    DWORD r, rread;
     COMMTIMEOUTS timeouts;
-    timeouts.ReadIntervalTimeout=MAXDWORD;
-    timeouts.ReadTotalTimeoutMultiplier=0;
-    timeouts.ReadTotalTimeoutConstant=timeout_ms;
-    timeouts.WriteTotalTimeoutMultiplier=0;
-    timeouts.WriteTotalTimeoutConstant=0;
+    timeouts.ReadIntervalTimeout = MAXDWORD;
+    timeouts.ReadTotalTimeoutMultiplier = 0;
+    timeouts.ReadTotalTimeoutConstant = timeout_ms;
+    timeouts.WriteTotalTimeoutMultiplier = 0;
+    timeouts.WriteTotalTimeoutConstant = 0;
 
-    SetCommTimeouts(
-            serial_handle,
-            &timeouts
-    );
-    while(len)
+    SetCommTimeouts (serial_handle, &timeouts);
+    while (len)
     {
-        r=ReadFile (serial_handle,
-                data,
-                len,
-                &rread,
-                NULL
-        );
+        r = ReadFile (serial_handle, data, len, &rread, NULL);
 
-        if(!r)
+        if (!r)
         {
-            l=GetLastError();
-            if(l==ERROR_SUCCESS)
+            l = GetLastError ();
+            if (l == ERROR_SUCCESS)
                 return 0;
             return -1;
-        }else
+        }
+        else
         {
-            if(rread==0)
+            if (rread == 0)
                 return 0;
         }
-        len-=rread;
-        data+=len;
+        len -= rread;
+        data += len;
     }
 
     return l;
@@ -240,21 +219,23 @@ int uart_rx(int len,unsigned char *data,int timeout_ms)
 
 #else
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <termios.h>
-#include <fcntl.h>
 #include <unistd.h>
 
 int serial_handle;
 
-void uart_list_devices() {}
+void uart_list_devices ()
+{
+}
 
-int uart_open(char *port)
+int uart_open (char *port)
 {
     struct termios options;
     int i;
 
-    serial_handle = open(port, (O_RDWR | O_NOCTTY /*| O_NDELAY*/));
+    serial_handle = open (port, (O_RDWR | O_NOCTTY /*| O_NDELAY*/));
 
     if (serial_handle < 0)
     {
@@ -264,25 +245,26 @@ int uart_open(char *port)
     /*
      * Get the current options for the port...
      */
-    tcgetattr(serial_handle, &options);
+    tcgetattr (serial_handle, &options);
 
     /*
      * Set the baud rates to 115200...
      */
-    cfsetispeed(&options, B115200);
-    cfsetospeed(&options, B115200);
+    cfsetispeed (&options, B115200);
+    cfsetospeed (&options, B115200);
 
     /*
      * Enable the receiver and set parameters ...
      */
     options.c_cflag &= ~(PARENB | CSTOPB | CSIZE | CRTSCTS | HUPCL);
     options.c_cflag |= (CS8 | CLOCAL | CREAD);
-    options.c_lflag &= ~(ICANON | ISIG | ECHO | ECHOE | ECHOK | ECHONL | ECHOCTL | ECHOPRT | ECHOKE | IEXTEN);
+    options.c_lflag &=
+        ~(ICANON | ISIG | ECHO | ECHOE | ECHOK | ECHONL | ECHOCTL | ECHOPRT | ECHOKE | IEXTEN);
     options.c_iflag &= ~(INPCK | IXON | IXOFF | IXANY | ICRNL);
     options.c_oflag &= ~(OPOST | ONLCR);
 
-    //printf( "size of c_cc = %d\n", sizeof( options.c_cc ) );
-    for ( i = 0; i < sizeof(options.c_cc); i++ )
+    // printf( "size of c_cc = %d\n", sizeof( options.c_cc ) );
+    for (i = 0; i < sizeof (options.c_cc); i++)
         options.c_cc[i] = _POSIX_VDISABLE;
 
     options.c_cc[VTIME] = 0;
@@ -291,55 +273,57 @@ int uart_open(char *port)
     /*
      * Set the new options for the port...
      */
-    tcsetattr(serial_handle, TCSAFLUSH, &options);
+    tcsetattr (serial_handle, TCSAFLUSH, &options);
 
     return 0;
 }
-void uart_close()
+void uart_close ()
 {
-    close(serial_handle);
+    close (serial_handle);
 }
 
-int uart_tx(int len,unsigned char *data)
+int uart_tx (int len, unsigned char *data)
 {
     ssize_t written;
 
-    while(len)
+    while (len)
     {
-        written=write(serial_handle, data, len);
-        if(!written)
+        written = write (serial_handle, data, len);
+        if (!written)
         {
             return -1;
         }
-        len-=written;
-        data+=len;
+        len -= written;
+        data += len;
     }
 
     return 0;
 }
-int uart_rx(int len,unsigned char *data,int timeout_ms)
+int uart_rx (int len, unsigned char *data, int timeout_ms)
 {
-    int l=len;
+    int l = len;
     ssize_t rread;
     struct termios options;
 
-    tcgetattr(serial_handle, &options);
-    options.c_cc[VTIME] = timeout_ms/100;
+    tcgetattr (serial_handle, &options);
+    options.c_cc[VTIME] = timeout_ms / 100;
     options.c_cc[VMIN] = 0;
-    tcsetattr(serial_handle, TCSANOW, &options);
+    tcsetattr (serial_handle, TCSANOW, &options);
 
-    while(len)
+    while (len)
     {
-        rread = read(serial_handle, data, len);
+        rread = read (serial_handle, data, len);
 
-        if(!rread)
+        if (!rread)
         {
             return 0;
-        } else if(rread < 0) {
+        }
+        else if (rread < 0)
+        {
             return -1;
         }
-        len-=rread;
-        data+=len;
+        len -= rread;
+        data += len;
     }
 
     return l;

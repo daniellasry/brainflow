@@ -6,6 +6,10 @@ MACHINE = $(shell $(CC) -dumpmachine)
 PLATFORM = POSIX
 LIBS = -lm
 LDFLAGS = -shared
+CFLAGS = -O1 -Wall -c -fmessage-length=0 -fPIC 
+ifeq ($(DEBUG), y)  
+	CFLAGS += -g -DDEBUG
+endif
 
 SRCS := $(wildcard ./Bglib/*.cpp)
 OBJS := $(SRCS:.cpp=.o)
@@ -14,7 +18,7 @@ DEPS := $(SRCS:.cpp=.d)
 all: $(TARGET)
 
 %.o: %.cpp
-	$(CC) -I./Interface/ -O3 -Wall -c -fmessage-length=0 -fPIC -DPLATFORM_$(PLATFORM) -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(CC) -I./Interface/ $(CFLAGS) -DPLATFORM_$(PLATFORM) -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 
 $(TARGET): $(OBJS)
 	@echo 'Building target: $@'

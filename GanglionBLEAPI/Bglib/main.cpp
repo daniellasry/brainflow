@@ -1,27 +1,3 @@
-//
-// Bluegiga’s Bluetooth Smart Demo Application
-// Contact: support@bluegiga.com.
-//
-// This is free software distributed under the terms of the MIT license
-// reproduced below.
-//
-// Copyright (c) 2012, Bluegiga Technologies
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THIS CODE AND INFORMATION ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND,
-// EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
-// WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
-//
-
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -39,10 +15,9 @@
 #define UART_TIMEOUT 1000
 #define MAX_ATTEMPTS 10
 
+
 void output (uint8 len1, uint8 *data1, uint16 len2, uint8 *data2);
-bd_addr str_to_bdaddr (char *str);
 int read_message (int timeout_ms);
-void print_bdaddr (bd_addr bdaddr);
 
 int exit_code = (int)GanglionLibNative::SYNC_ERROR;
 char uart_port[1024];
@@ -52,7 +27,6 @@ namespace GanglionLibNative
 {
     int initialize (void *param)
     {
-        std::cout << "param is " << (char *)param << std::endl;
         strcpy (uart_port, (char *)param);
         bglib_output = output;
         exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
@@ -70,7 +44,7 @@ namespace GanglionLibNative
         return (int)CustomExitCodesNative::STATUS_OK;
     }
 
-    // TODO: IMPLEMENT
+    // TODO: IMPLEMENT IF SCAN WORKS WITHOUT ISSUES
     int open_ganglion_native (void *param)
     {
         return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
@@ -80,16 +54,30 @@ namespace GanglionLibNative
     {
         exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
         char *mac_addr = (char *)param;
-        connect_addr = str_to_bdaddr (mac_addr);
-        print_bdaddr (connect_addr);
-
+        // convert string mac addr to bd_addr struct
+        for (int i = 0; i < strlen (mac_addr); i++)
+        {
+            mac_addr[i] = tolower (mac_addr[i]);
+        }
+        short unsigned int addr[6];
+        if (sscanf (mac_addr, "%02hx:%02hx:%02hx:%02hx:%02hx:%02hx", &addr[5], &addr[4], &addr[3],
+                &addr[2], &addr[1], &addr[0]) == 6)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                connect_addr.addr[i] = addr[i];
+            }
+        }
+        else
+        {
+            return (int)CustomExitCodesNative::INVALID_MAC_ADDR_ERROR;
+        }
+        // send command to connect
         ble_cmd_gap_connect_direct (&connect_addr, gap_address_type_random, 40, 60, 100, 0);
-
-        int i = 0;
+        // wait for callback to be triggered
         for (int i = 0; (i < MAX_ATTEMPTS) && (exit_code == (int)CustomExitCodesNative::SYNC_ERROR);
              i++)
         {
-            usleep (500000);
             if (read_message (UART_TIMEOUT) > 0)
                 break;
         }
@@ -97,32 +85,34 @@ namespace GanglionLibNative
         return exit_code;
     }
 
+    // TODO IMPLEMENT ALL METHODS BELOW AND REQUIRED CALLBACKS IN CALLBACKS.CPP
+    int stop_stream_native (void *param)
+    {
+        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+    }
+
+    int start_stream_native (void *param)
+    {
+        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+    }
+
+    int close_ganglion_native (void *param)
+    {
+        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+    }
+
+    int get_data_native (void *param)
+    {
+        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+    }
+
 } // GanglionLibNative
-
-bd_addr str_to_bdaddr (char *str)
-{
-    bd_addr res;
-    short unsigned int addr[6];
-    if (sscanf (str, "%02hx:%02hx:%02hx:%02hx:%02hx:%02hx", &addr[5], &addr[4], &addr[3], &addr[2],
-            &addr[1], &addr[0]) == 6)
-    {
-
-        for (int i = 0; i < 6; i++)
-        {
-            res.addr[i] = addr[i];
-        }
-    }
-    else
-    {
-        std::cout << "huj" << std::endl;
-    }
-    return res;
-}
 
 void output (uint8 len1, uint8 *data1, uint16 len2, uint8 *data2)
 {
 }
 
+// reads messages and calls required callbacks
 int read_message (int timeout_ms)
 {
     unsigned char data[256]; // enough for BLE
@@ -132,68 +122,38 @@ int read_message (int timeout_ms)
     r = uart_rx (sizeof (hdr), (unsigned char *)&hdr, UART_TIMEOUT);
     if (!r)
     {
+#ifdef DEBUG
+        std::cout << "read_message timeout" << std::endl;
+#endif
         return -1; // timeout
     }
     else if (r < 0)
     {
-        printf ("ERROR: Reading header failed. Error code:%d\n", r);
-        return 1;
+        exit_code = (int)GanglionLibNative::PORT_OPEN_ERROR;
+        return 1; // fails to read
     }
-
+#ifdef DEBUG
+    std::cout << "read_message read smth" << std::endl;
+#endif
     if (hdr.lolen)
     {
         r = uart_rx (hdr.lolen, data, UART_TIMEOUT);
         if (r <= 0)
         {
-            printf ("ERROR: Reading data failed. Error code:%d\n", r);
-            return 1;
+            exit_code = (int)GanglionLibNative::PORT_OPEN_ERROR;
+            return 1; // fails to read
         }
     }
 
     const struct ble_msg *msg = ble_get_msg_hdr (hdr);
 
-#ifdef DEBUG
-    print_raw_packet (&hdr, data);
-#endif
-
     if (!msg)
     {
-        printf ("ERROR: Unknown message received\n");
-        exit (1);
+        exit_code = (int)GanglionLibNative::GENERAL_ERROR;
+        return 1;
     }
 
     msg->handler (data);
 
     return 0;
-}
-
-void ble_evt_gap_scan_response (const struct ble_msg_gap_scan_response_evt_t *msg)
-{
-    for (int i = 0; i < 6; i++)
-        printf (" %d ", msg->sender.addr[i]);
-    printf ("\n");
-}
-
-void ble_evt_connection_status (const struct ble_msg_connection_status_evt_t *msg)
-{
-    // New connection
-    if (msg->flags & connection_connected)
-    {
-        // exit_code = (int)GanglionLibNative::STATUS_OK;
-        printf ("Connected\n");
-        fflush (stdout);
-    }
-}
-
-void ble_evt_connection_disconnected (const struct ble_msg_connection_disconnected_evt_t *msg)
-{
-    std::cout << "reconnect" << std::endl;
-    ble_cmd_gap_connect_direct (&connect_addr, gap_address_type_random, 40, 60, 100, 0);
-}
-
-void print_bdaddr (bd_addr bdaddr)
-{
-    printf ("%02x:%02x:%02x:%02x:%02x:%02x", bdaddr.addr[5], bdaddr.addr[4], bdaddr.addr[3],
-        bdaddr.addr[2], bdaddr.addr[1], bdaddr.addr[0]);
-    fflush (stdout);
 }
