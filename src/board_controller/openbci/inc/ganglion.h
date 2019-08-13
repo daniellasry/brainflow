@@ -45,10 +45,7 @@ private:
     void read_thread ();
 
 #ifndef _WIN32
-    // for dongle(unix) I didnt add auto discovery, so mac address should be passed while for
-    // windows it can be empty, and we need to keep port too
     char dongle_port[1024];
-    char input_string[1024];
 #endif
 
 public:

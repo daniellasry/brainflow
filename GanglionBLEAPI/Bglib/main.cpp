@@ -44,9 +44,35 @@ namespace GanglionLibNative
         return (int)CustomExitCodesNative::STATUS_OK;
     }
 
-    // TODO: IMPLEMENT IF SCAN WORKS WITHOUT ISSUES
     int open_ganglion_native (void *param)
     {
+        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
+        ble_cmd_gap_discover (gap_discover_observation);
+        for (int i = 0; (i < MAX_ATTEMPTS) && (exit_code == (int)CustomExitCodesNative::SYNC_ERROR);
+             i++)
+        {
+            if (read_message (UART_TIMEOUT) > 0)
+                break;
+        }
+        if (exit_code != (int)CustomExitCodesNative::STATUS_OK)
+        {
+#ifdef DEBUG
+            std::cout << "Failed to find Ganglion" << std::endl;
+#endif
+            return exit_code;
+        }
+        ble_cmd_gap_end_procedure ();
+        // send command to connect
+        ble_cmd_gap_connect_direct (&connect_addr, gap_address_type_random, 40, 60, 100, 0);
+        // wait for callback to be triggered
+        for (int i = 0; (i < MAX_ATTEMPTS) && (exit_code == (int)CustomExitCodesNative::SYNC_ERROR);
+             i++)
+        {
+            if (read_message (UART_TIMEOUT) > 0)
+                break;
+        }
+
+        return exit_code;
         return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
     }
 
@@ -85,7 +111,6 @@ namespace GanglionLibNative
         return exit_code;
     }
 
-    // TODO IMPLEMENT ALL METHODS BELOW AND REQUIRED CALLBACKS IN CALLBACKS.CPP
     int stop_stream_native (void *param)
     {
         return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
@@ -110,6 +135,13 @@ namespace GanglionLibNative
 
 void output (uint8 len1, uint8 *data1, uint16 len2, uint8 *data2)
 {
+    if (uart_tx (len1, data1) || uart_tx (len2, data2))
+    {
+        exit_code = (int)GanglionLibNative::GANGLION_NOT_FOUND_ERROR;
+#ifdef DEBUG
+        std::cout << "failed to write to uart" << std::endl;
+#endif
+    }
 }
 
 // reads messages and calls required callbacks

@@ -19,46 +19,77 @@
 
 Ganglion::Ganglion (const char *port_name) : Board ()
 {
+    // get full path of ganglioblibnative with assumption that this lib is in the same folder
+    char ganglionlib_dir[1024];
+    bool res = get_dll_path (ganglionlib_dir);
+    std::string ganglioblib_path = "";
+#ifdef _WIN32
+    // check port
     if (port_name == NULL)
     {
         this->use_mac_addr = false;
     }
     else
     {
-#ifdef _WIN32
-        strcpy (this->mac_addr, port_name);
-#else
-        strcpy (this->input_string, port_name);
-#endif
-        this->use_mac_addr = true;
+        strcpy (this->mac_addr, port_name)
     }
-
-    // get full path of ganglioblibnative with assumption that this lib is in the same folder
-    char ganglionlib_dir[1024];
-    bool res = get_dll_path (ganglionlib_dir);
-    std::string ganglioblib_path = "";
-#ifdef _WIN32
+    // get library path
     if (sizeof (void *) == 8)
     {
         if (res)
+        {
             ganglioblib_path = std::string (ganglionlib_dir) + "GanglionLibNative64.dll";
+        }
         else
+        {
             ganglioblib_path = "GanglionLibNative64.dll";
+        }
     }
     else
     {
         if (res)
+        {
             ganglioblib_path = std::string (ganglionlib_dir) + "GanglionLibNative32.dll";
+        }
         else
+        {
             ganglioblib_path = "GanglionLibNative32.dll";
+        }
     }
 #else
-    // only 64 bit for unix
-    if (res)
-        ganglioblib_path = std::string (ganglionlib_dir) + "GanglionLibrary.so";
+    // parse input string with port and mac addr for unix systems
+    std::string input_string = port_name;
+    size_t comma_pos =
+        input_string.find_first_of (","); // expected string format "dongle_port,mac_addr" if mac
+                                          // addr is not specified - use autodiscovery
+    if ((comma_pos == std::string::npos) || (comma_pos == input_string.length ()))
+    {
+        strcpy (this->dongle_port, port_name);
+        this->use_mac_addr = false;
+        Board::board_logger->info ("use autodiscovery, mac addr is not specified");
+    }
     else
+    {
+        std::string str_port = input_string.substr (0, comma_pos);
+        std::string str_mac = input_string.substr (comma_pos + 1);
+        strcpy (this->mac_addr, str_mac.c_str ());
+        strcpy (this->dongle_port, str_port.c_str ());
+        this->use_mac_addr = true;
+        Board::board_logger->info (
+            "use port {} and mac addr {}", this->dongle_port, this->mac_addr);
+    }
+
+    // get lib path, only 64 bit for unix
+    if (res)
+    {
+        ganglioblib_path = std::string (ganglionlib_dir) + "GanglionLibrary.so";
+    }
+    else
+    {
         ganglioblib_path = "GanglionLibrary.so";
+    }
 #endif
+
     Board::board_logger->debug ("use dyn lib: {}", ganglioblib_path.c_str ());
     dll_loader = new DLLLoader (ganglioblib_path.c_str ());
 
@@ -81,27 +112,6 @@ int Ganglion::prepare_session ()
         Board::board_logger->info ("Session is already prepared");
         return STATUS_OK;
     }
-
-#ifndef _WIN32
-    if (!this->use_mac_addr)
-    {
-        Board::board_logger->error ("auto discovery for ganglion is not supported on UNIX");
-        return INVALID_ARGUMENTS_ERROR;
-    }
-    std::string input_string = this->input_string;
-    size_t comma_pos = input_string.find_first_of (",");
-    if ((comma_pos == std::string::npos) || (comma_pos == input_string.length ()))
-    {
-        Board::board_logger->error ("invalid format for port_name, for UNIX you need dongle and "
-                                    "pass port name like 'port_name,mac_addr'");
-        return INVALID_ARGUMENTS_ERROR;
-    }
-    std::string str_port = input_string.substr (0, comma_pos);
-    std::string str_mac = input_string.substr (comma_pos + 1);
-    strcpy (this->mac_addr, str_mac.c_str ());
-    strcpy (this->dongle_port, str_port.c_str ());
-    Board::board_logger->info ("use port {} and mac addr {}", this->dongle_port, this->mac_addr);
-#endif
 
     if (!this->dll_loader->load_library ())
     {
@@ -241,7 +251,7 @@ void Ganglion::read_thread ()
     {
         struct GanglionLibNative::GanglionDataNative data;
         int res = (func) ((void *)&data);
-        if (res == GanglionLibNative::CustomExitCodesNative::STATUS_OK)
+        if (res == (int)GanglionLibNative::CustomExitCodesNative::STATUS_OK)
         {
             if (this->state != STATUS_OK)
             {
@@ -404,23 +414,6 @@ void Ganglion::read_thread ()
     }
 }
 
-int Ganglion::call_start ()
-{
-    DLLFunc func = this->dll_loader->get_address ("start_stream_native");
-    if (func == NULL)
-    {
-        Board::board_logger->error ("failed to get function address for start_stream_native");
-        return GENERAL_ERROR;
-    }
-    int res = (func) (NULL);
-    if (res != GanglionLibNative::CustomExitCodesNative::STATUS_OK)
-    {
-        Board::board_logger->error ("failed to start streaming {}", res);
-        return GENERAL_ERROR;
-    }
-    return STATUS_OK;
-}
-
 int Ganglion::call_init ()
 {
     DLLFunc func = this->dll_loader->get_address ("initialize");
@@ -434,7 +427,7 @@ int Ganglion::call_init ()
 #else
     int res = (func) (this->dongle_port);
 #endif
-    if (res != GanglionLibNative::CustomExitCodesNative::STATUS_OK)
+    if (res != (int)GanglionLibNative::CustomExitCodesNative::STATUS_OK)
     {
         Board::board_logger->error ("failed to init GanglionLib {}", res);
         return GENERAL_ERROR;
@@ -474,6 +467,23 @@ int Ganglion::call_open ()
         return GENERAL_ERROR;
     }
     Board::board_logger->info ("Found Ganglion Device");
+    return STATUS_OK;
+}
+
+int Ganglion::call_start ()
+{
+    DLLFunc func = this->dll_loader->get_address ("start_stream_native");
+    if (func == NULL)
+    {
+        Board::board_logger->error ("failed to get function address for start_stream_native");
+        return GENERAL_ERROR;
+    }
+    int res = (func) (NULL);
+    if (res != (int)GanglionLibNative::CustomExitCodesNative::STATUS_OK)
+    {
+        Board::board_logger->error ("failed to start streaming {}", res);
+        return GENERAL_ERROR;
+    }
     return STATUS_OK;
 }
 
