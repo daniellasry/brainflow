@@ -82,11 +82,10 @@ namespace GanglionLibNative
                     }
                 }
             }
-
             return nullptr;
         }
 
-        int initialize (void *param)
+        int initialize_native (void *param)
     {
         if (!is_initialized)
         {
@@ -153,5 +152,12 @@ namespace GanglionLibNative
             boardData->data[i] = (unsigned char)managedData->data[i];
         }
         return (int)CustomExitCodesNative::STATUS_OK;
+    }
+
+    int config_board_native (void *param)
+    {
+        Ganglion ^ wrapper = GanglionLibWrapper::instance->ganglion_obj;
+        String ^ conf_str = gcnew String ((char *)param);
+        return wrapper->config_board (conf_str, true); // use send characteristic
     }
 }
