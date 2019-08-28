@@ -44,10 +44,6 @@ private:
 
     void read_thread ();
 
-#ifndef _WIN32
-    char dongle_port[1024];
-#endif
-
 public:
     Ganglion (const char *port_name);
     ~Ganglion ();

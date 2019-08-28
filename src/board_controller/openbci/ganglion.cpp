@@ -19,11 +19,6 @@
 
 Ganglion::Ganglion (const char *port_name) : Board ()
 {
-    // get full path of ganglioblibnative with assumption that this lib is in the same folder
-    char ganglionlib_dir[1024];
-    bool res = get_dll_path (ganglionlib_dir);
-    std::string ganglioblib_path = "";
-#ifdef _WIN32
     // check port
     if (port_name == NULL)
     {
@@ -33,6 +28,11 @@ Ganglion::Ganglion (const char *port_name) : Board ()
     {
         strcpy (this->mac_addr, port_name)
     }
+    // get full path of ganglioblibnative with assumption that this lib is in the same folder
+    char ganglionlib_dir[1024];
+    bool res = get_dll_path (ganglionlib_dir);
+    std::string ganglioblib_path = "";
+#ifdef _WIN32
     // get library path
     if (sizeof (void *) == 8)
     {
@@ -57,28 +57,6 @@ Ganglion::Ganglion (const char *port_name) : Board ()
         }
     }
 #else
-    // parse input string with port and mac addr for unix systems
-    std::string input_string = port_name;
-    size_t comma_pos =
-        input_string.find_first_of (","); // expected string format "dongle_port,mac_addr" if mac
-                                          // addr is not specified - use autodiscovery
-    if ((comma_pos == std::string::npos) || (comma_pos == input_string.length ()))
-    {
-        strcpy (this->dongle_port, port_name);
-        this->use_mac_addr = false;
-        Board::board_logger->info ("use autodiscovery, mac addr is not specified");
-    }
-    else
-    {
-        std::string str_port = input_string.substr (0, comma_pos);
-        std::string str_mac = input_string.substr (comma_pos + 1);
-        strcpy (this->mac_addr, str_mac.c_str ());
-        strcpy (this->dongle_port, str_port.c_str ());
-        this->use_mac_addr = true;
-        Board::board_logger->info (
-            "use port {} and mac addr {}", this->dongle_port, this->mac_addr);
-    }
-
     // get lib path, only 64 bit for unix
     if (res)
     {
@@ -422,11 +400,7 @@ int Ganglion::call_init ()
         Board::board_logger->error ("failed to get function address for initialize");
         return GENERAL_ERROR;
     }
-#ifdef _WIN32
     int res = (func) (NULL);
-#else
-    int res = (func) (this->dongle_port);
-#endif
     if (res != (int)GanglionLibNative::CustomExitCodesNative::STATUS_OK)
     {
         Board::board_logger->error ("failed to init GanglionLib {}", res);
