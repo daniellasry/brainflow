@@ -160,4 +160,9 @@ namespace GanglionLibNative
         String ^ conf_str = gcnew String ((char *)param);
         return wrapper->config_board (conf_str, true); // use send characteristic
     }
+
+	int release_native (void *param)
+	{
+        return (int)CustomExitCodesNative::STATUS_OK;
+	}
 }
