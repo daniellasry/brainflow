@@ -125,30 +125,45 @@ void ble_evt_attclient_procedure_completed (
                 ganglion_handle_end); // triggers ble_evt_attclient_find_information_found
         }
     }
+    // triggered after ble_cmd_attclient_attribute_write
+    else if (state == State::config_called)
+    {
+        if (msg->result == 0)
+        {
+            {
+                std::lock_guard<std::mutex> lk (m);
+                exit_code = (int)GanglionLibNative::STATUS_OK;
+            }
+            cv.notify_one ();
+        }
+    }
 }
 
 // finds characteristic handles and set exit_code for open_ganglion call
 void ble_evt_attclient_find_information_found (
     const struct ble_msg_attclient_find_information_found_evt_t *msg)
 {
-    if (msg->uuid.len == 2)
+    if (state == State::open_called)
     {
-        uint16 uuid = (msg->uuid.data[1] << 8) | msg->uuid.data[0];
-        if (uuid == GANGLION_RECV_CHAR_UUID)
+        if (msg->uuid.len == 2)
         {
-            ganglion_handle_recv = msg->chrhandle;
+            uint16 uuid = (msg->uuid.data[1] << 8) | msg->uuid.data[0];
+            if (uuid == GANGLION_RECV_CHAR_UUID)
+            {
+                ganglion_handle_recv = msg->chrhandle;
+            }
+            else if (uuid == GANGLION_SEND_CHAR_UUID)
+            {
+                ganglion_handle_send = msg->chrhandle;
+            }
         }
-        else if (uuid == GANGLION_SEND_CHAR_UUID)
+        if ((ganglion_handle_send) && (ganglion_handle_recv))
         {
-            ganglion_handle_send = msg->chrhandle;
+            {
+                std::lock_guard<std::mutex> lk (m);
+                exit_code = (int)GanglionLibNative::STATUS_OK;
+            }
+            cv.notify_one ();
         }
-    }
-    if ((ganglion_handle_send) && (ganglion_handle_recv))
-    {
-        {
-            std::lock_guard<std::mutex> lk (m);
-            exit_code = (int)GanglionLibNative::STATUS_OK;
-        }
-        cv.notify_one ();
     }
 }

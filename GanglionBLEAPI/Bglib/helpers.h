@@ -16,11 +16,9 @@ enum class State : int
     init_called = 1,
     initial_connection = 2,
     open_called = 3,
-    start_stream_called = 4,
-    stop_stream_called = 5,
-    config_called = 6,
-    close_called = 7,
-    get_data_called = 8
+    config_called = 4,
+    close_called = 5,
+    get_data_called = 6
 };
 
 void output (uint8 len1, uint8 *data1, uint16 len2, uint8 *data2);

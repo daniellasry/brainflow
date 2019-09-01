@@ -174,7 +174,10 @@ int Ganglion::stop_stream ()
     {
         this->keep_alive = false;
         this->is_streaming = false;
-        this->streaming_thread.join ();
+        if (this->streaming_thread.joinable ())
+        {
+            this->streaming_thread.join ();
+        }
         this->state = SYNC_TIMEOUT_ERROR;
         return this->call_stop ();
     }

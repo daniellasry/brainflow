@@ -12,7 +12,11 @@
 #include "helpers.h"
 #include "uart.h"
 
+#include <iostream>
+
 #include "GanglionNativeInterface.h"
+
+// read Bluetooth_Smart_Software_v1.3.1_API_Reference.pdf to understand at least smth here
 
 volatile int exit_code = (int)GanglionLibNative::SYNC_ERROR;
 char uart_port[1024];
@@ -82,11 +86,11 @@ namespace GanglionLibNative
         {
             return (int)CustomExitCodesNative::GANGLION_ALREADY_OPEN_ERROR;
         }
+        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
         keep_alive = true;
         read_message_thread = std::thread (read_message_worker);
 
         state = State::open_called;
-        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
         ble_cmd_gap_discover (gap_discover_observation);
 
         int res = wait_for_callback (5);
@@ -104,11 +108,11 @@ namespace GanglionLibNative
         {
             return (int)CustomExitCodesNative::GANGLION_ALREADY_OPEN_ERROR;
         }
+        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
         keep_alive = true;
         read_message_thread = std::thread (read_message_worker);
 
         state = State::open_called;
-        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
         char *mac_addr = (char *)param;
         // convert string mac addr to bd_addr struct
         for (int i = 0; i < strlen (mac_addr); i++)
@@ -133,46 +137,68 @@ namespace GanglionLibNative
 
     int stop_stream_native (void *param)
     {
-        state = State::stop_stream_called;
-        if (!ganglion_handle_send)
-        {
-            return (int)CustomExitCodesNative::SEND_CHARACTERISTIC_NOT_FOUND_ERROR;
-        }
-        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
-        uint8 stop_char = 's';
-        ble_cmd_attclient_attribute_write (connection, ganglion_handle_send, 1, &stop_char);
-        return wait_for_callback (5);
+        return config_board_native ((void *)"s");
     }
 
     int start_stream_native (void *param)
     {
-        state = State::start_stream_called;
-        if (!ganglion_handle_send)
-        {
-            return (int)CustomExitCodesNative::SEND_CHARACTERISTIC_NOT_FOUND_ERROR;
-        }
-        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
-        uint8 start_char = 'b';
-        ble_cmd_attclient_attribute_write (connection, ganglion_handle_send, 1, &start_char);
-        return wait_for_callback (5);
+        return config_board_native ((void *)"b");
     }
 
     int close_ganglion_native (void *param)
     {
+        if (!keep_alive)
+        {
+            return (int)CustomExitCodesNative::GANGLION_IS_NOT_OPEN_ERROR;
+        }
         state = State::close_called;
-        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+
+        stop_stream_native (NULL);
+
+        keep_alive = false;
+        if (read_message_thread.joinable ())
+        {
+            read_message_thread.join ();
+        }
+
+        uart_close ();
+
+        connection = 0;
+        ganglion_handle_start = 0;
+        ganglion_handle_end = 0;
+        ganglion_handle_recv = 0;
+        ganglion_handle_send = 0;
+        state = State::none;
+        return (int)CustomExitCodesNative::STATUS_OK;
     }
 
     int get_data_native (void *param)
     {
+        if (!keep_alive)
+        {
+            return (int)CustomExitCodesNative::GANGLION_IS_NOT_OPEN_ERROR;
+        }
         state = State::get_data_called;
         return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
     }
 
     int config_board_native (void *param)
     {
+        if (!keep_alive)
+        {
+            return (int)CustomExitCodesNative::GANGLION_IS_NOT_OPEN_ERROR;
+        }
+        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
+        char *config = (char *)param;
+        int len = strlen (config);
         state = State::config_called;
-        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+        if (!ganglion_handle_send)
+        {
+            return (int)CustomExitCodesNative::SEND_CHARACTERISTIC_NOT_FOUND_ERROR;
+        }
+        ble_cmd_attclient_attribute_write (connection, ganglion_handle_send, len, (uint8 *)&config);
+        int res = wait_for_callback (5);
+        return res;
     }
 
 } // GanglionLibNative
