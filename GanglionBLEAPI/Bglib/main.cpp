@@ -1,83 +1,113 @@
+#include <chrono>
+#include <condition_variable>
 #include <ctype.h>
-#include <math.h>
-#include <stdio.h>
+#include <mutex>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <thread>
 #include <unistd.h>
 
 #include "cmd_def.h"
+#include "helpers.h"
 #include "uart.h"
 
 #include "GanglionNativeInterface.h"
 
-#include <iostream>
-
-#define UART_TIMEOUT 1000
-#define MAX_ATTEMPTS 10
-
-
-void output (uint8 len1, uint8 *data1, uint16 len2, uint8 *data2);
-int read_message (int timeout_ms);
-
-int exit_code = (int)GanglionLibNative::SYNC_ERROR;
+volatile int exit_code = (int)GanglionLibNative::SYNC_ERROR;
 char uart_port[1024];
-bd_addr connect_addr;
+volatile bd_addr connect_addr;
+volatile uint8 connection = 0;
+volatile uint16 ganglion_handle_start = 0; // I have no idea what it is but seems like its important
+volatile uint16 ganglion_handle_end = 0;
+volatile uint16 ganglion_handle_recv = 0;
+volatile uint16 ganglion_handle_send = 0;
+volatile State state =
+    State::none; // same callbacks are triggered by different methods we need to differ them
+
+std::thread
+    read_message_thread; // read_message should be executed in a loop but connection has
+                         // small timeout and need to be updated via callback for disconnect
+                         // so we need to keep connection up to date I run read_message
+                         // during all execution, not only when we call start\stop and other merhods
+volatile bool keep_alive = false;
+std::mutex m;
+std::condition_variable cv;
+
+bool initialized = false;
+
+
+void read_message_worker ()
+{
+    while (keep_alive)
+    {
+        read_message (UART_TIMEOUT);
+    }
+}
 
 namespace GanglionLibNative
 {
-    int initialize (void *param)
+    int initialize_native (void *param)
     {
-        strcpy (uart_port, (char *)param);
-        bglib_output = output;
-        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
-        if (uart_open (uart_port))
+        // there is no release method, ensure that we init all this staff once
+        if (!initialized)
         {
-            return (int)CustomExitCodesNative::GANGLION_NOT_FOUND_ERROR;
+            std::string dongle_port = get_dongle_port ();
+            if (dongle_port.empty ())
+            {
+                return (int)CustomExitCodesNative::GANGLION_DONGLE_PORT_IS_NOT_SET_ERROR;
+            }
+            strcpy (uart_port, dongle_port.c_str ());
+            bglib_output = output;
+            exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
+            if (uart_open (uart_port))
+            {
+                return (int)CustomExitCodesNative::GANGLION_NOT_FOUND_ERROR;
+            }
+            // Reset dongle to get it into known state
+            ble_cmd_system_reset (0);
+            uart_close ();
+            do
+            {
+                usleep (500000); // 0.5s
+            } while (uart_open (uart_port));
+            initialized = true;
         }
-        // Reset dongle to get it into known state
-        ble_cmd_system_reset (0);
-        uart_close ();
-        do
-        {
-            usleep (500000); // 0.5s
-        } while (uart_open (uart_port));
         return (int)CustomExitCodesNative::STATUS_OK;
     }
 
     int open_ganglion_native (void *param)
     {
+        if (keep_alive)
+        {
+            return (int)CustomExitCodesNative::GANGLION_ALREADY_OPEN_ERROR;
+        }
+        keep_alive = true;
+        read_message_thread = std::thread (read_message_worker);
+
+        state = State::open_called;
         exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
         ble_cmd_gap_discover (gap_discover_observation);
-        for (int i = 0; (i < MAX_ATTEMPTS) && (exit_code == (int)CustomExitCodesNative::SYNC_ERROR);
-             i++)
+
+        int res = wait_for_callback (5);
+        if (res != (int)CustomExitCodesNative::STATUS_OK)
         {
-            if (read_message (UART_TIMEOUT) > 0)
-                break;
-        }
-        if (exit_code != (int)CustomExitCodesNative::STATUS_OK)
-        {
-#ifdef DEBUG
-            std::cout << "Failed to find Ganglion" << std::endl;
-#endif
-            return exit_code;
+            return res;
         }
         ble_cmd_gap_end_procedure ();
-        // send command to connect
-        ble_cmd_gap_connect_direct (&connect_addr, gap_address_type_random, 40, 60, 100, 0);
-        // wait for callback to be triggered
-        for (int i = 0; (i < MAX_ATTEMPTS) && (exit_code == (int)CustomExitCodesNative::SYNC_ERROR);
-             i++)
-        {
-            if (read_message (UART_TIMEOUT) > 0)
-                break;
-        }
-
-        return exit_code;
-        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+        return open_ble_dev ();
     }
 
     int open_ganglion_mac_addr_native (void *param)
     {
+        if (keep_alive)
+        {
+            return (int)CustomExitCodesNative::GANGLION_ALREADY_OPEN_ERROR;
+        }
+        keep_alive = true;
+        read_message_thread = std::thread (read_message_worker);
+
+        state = State::open_called;
         exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
         char *mac_addr = (char *)param;
         // convert string mac addr to bd_addr struct
@@ -98,94 +128,51 @@ namespace GanglionLibNative
         {
             return (int)CustomExitCodesNative::INVALID_MAC_ADDR_ERROR;
         }
-        // send command to connect
-        ble_cmd_gap_connect_direct (&connect_addr, gap_address_type_random, 40, 60, 100, 0);
-        // wait for callback to be triggered
-        for (int i = 0; (i < MAX_ATTEMPTS) && (exit_code == (int)CustomExitCodesNative::SYNC_ERROR);
-             i++)
-        {
-            if (read_message (UART_TIMEOUT) > 0)
-                break;
-        }
-
-        return exit_code;
+        return open_ble_dev ();
     }
 
     int stop_stream_native (void *param)
     {
-        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+        state = State::stop_stream_called;
+        if (!ganglion_handle_send)
+        {
+            return (int)CustomExitCodesNative::SEND_CHARACTERISTIC_NOT_FOUND_ERROR;
+        }
+        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
+        uint8 stop_char = 's';
+        ble_cmd_attclient_attribute_write (connection, ganglion_handle_send, 1, &stop_char);
+        return wait_for_callback (5);
     }
 
     int start_stream_native (void *param)
     {
-        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+        state = State::start_stream_called;
+        if (!ganglion_handle_send)
+        {
+            return (int)CustomExitCodesNative::SEND_CHARACTERISTIC_NOT_FOUND_ERROR;
+        }
+        exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
+        uint8 start_char = 'b';
+        ble_cmd_attclient_attribute_write (connection, ganglion_handle_send, 1, &start_char);
+        return wait_for_callback (5);
     }
 
     int close_ganglion_native (void *param)
     {
+        state = State::close_called;
         return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
     }
 
     int get_data_native (void *param)
     {
+        state = State::get_data_called;
+        return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
+    }
+
+    int config_board_native (void *param)
+    {
+        state = State::config_called;
         return (int)CustomExitCodesNative::NOT_IMPLEMENTED_ERROR;
     }
 
 } // GanglionLibNative
-
-void output (uint8 len1, uint8 *data1, uint16 len2, uint8 *data2)
-{
-    if (uart_tx (len1, data1) || uart_tx (len2, data2))
-    {
-        exit_code = (int)GanglionLibNative::GANGLION_NOT_FOUND_ERROR;
-#ifdef DEBUG
-        std::cout << "failed to write to uart" << std::endl;
-#endif
-    }
-}
-
-// reads messages and calls required callbacks
-int read_message (int timeout_ms)
-{
-    unsigned char data[256]; // enough for BLE
-    struct ble_header hdr;
-    int r;
-
-    r = uart_rx (sizeof (hdr), (unsigned char *)&hdr, UART_TIMEOUT);
-    if (!r)
-    {
-#ifdef DEBUG
-        std::cout << "read_message timeout" << std::endl;
-#endif
-        return -1; // timeout
-    }
-    else if (r < 0)
-    {
-        exit_code = (int)GanglionLibNative::PORT_OPEN_ERROR;
-        return 1; // fails to read
-    }
-#ifdef DEBUG
-    std::cout << "read_message read smth" << std::endl;
-#endif
-    if (hdr.lolen)
-    {
-        r = uart_rx (hdr.lolen, data, UART_TIMEOUT);
-        if (r <= 0)
-        {
-            exit_code = (int)GanglionLibNative::PORT_OPEN_ERROR;
-            return 1; // fails to read
-        }
-    }
-
-    const struct ble_msg *msg = ble_get_msg_hdr (hdr);
-
-    if (!msg)
-    {
-        exit_code = (int)GanglionLibNative::GENERAL_ERROR;
-        return 1;
-    }
-
-    msg->handler (data);
-
-    return 0;
-}

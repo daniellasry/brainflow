@@ -14,20 +14,6 @@ void ble_rsp_system_get_info (const struct ble_msg_system_get_info_rsp_t *msg)
 {
 }
 
-void ble_evt_attclient_group_found (const struct ble_msg_attclient_group_found_evt_t *msg)
-{
-}
-
-void ble_evt_attclient_procedure_completed (
-    const struct ble_msg_attclient_procedure_completed_evt_t *msg)
-{
-}
-
-void ble_evt_attclient_find_information_found (
-    const struct ble_msg_attclient_find_information_found_evt_t *msg)
-{
-}
-
 void ble_evt_attclient_attribute_value (const struct ble_msg_attclient_attribute_value_evt_t *msg)
 {
 }

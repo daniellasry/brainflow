@@ -1,26 +1,39 @@
+#include <condition_variable>
 #include <ctype.h>
 #include <math.h>
+#include <mutex>
 #include <stdlib.h>
 #include <string.h>
-
 #include <unistd.h>
 
 #include "GanglionNativeInterface.h"
 #include "cmd_def.h"
+#include "helpers.h"
 #include "uart.h"
 
 #include <iostream>
 
-extern int exit_code;
-extern bd_addr connect_addr;
+#define GANGLION_SERVICE_UUID 0xfe84
+// seems like in this api chars uuids are not the same as in microsoft api
+#define GANGLION_SEND_CHAR_UUID 0x2803 // maybe it's not what we need or maybe we need to swap them
+#define GANGLION_RECV_CHAR_UUID 0x2800
 
-// majority of callbacks are stubs in stubs.cpp file
+extern volatile int exit_code;
+extern volatile bd_addr connect_addr;
+extern volatile uint8 connection;
+extern volatile uint16 ganglion_handle_start;
+extern volatile uint16 ganglion_handle_end;
+// recv and send chars handles
+extern volatile uint16 ganglion_handle_recv;
+extern volatile uint16 ganglion_handle_send;
+extern volatile State state;
+
+extern std::mutex m;
+extern std::condition_variable cv;
+
 void ble_evt_gap_scan_response (const struct ble_msg_gap_scan_response_evt_t *msg)
 {
     char *name = NULL;
-    // memcpy (found_devices[i].addr, msg->sender.addr, sizeof (bd_addr));
-
-    // Parse data
     for (int i = 0; i < msg->data.len;)
     {
         int8 len = msg->data.data[i++];
@@ -46,13 +59,14 @@ void ble_evt_gap_scan_response (const struct ble_msg_gap_scan_response_evt_t *ms
 
     if (name)
     {
-#ifdef DEBUG
-        std::cout << "Name:" << name << std::endl;
-#endif
         if (strstr (name, "anglion") != NULL)
         {
-            memcpy (connect_addr.addr, msg->sender.addr, sizeof (bd_addr));
-            exit_code = (int)GanglionLibNative::STATUS_OK;
+            memcpy ((void *)connect_addr.addr, msg->sender.addr, sizeof (bd_addr));
+            {
+                std::lock_guard<std::mutex> lk (m);
+                exit_code = (int)GanglionLibNative::STATUS_OK;
+            }
+            cv.notify_one ();
         }
     }
 
@@ -64,17 +78,77 @@ void ble_evt_connection_status (const struct ble_msg_connection_status_evt_t *ms
     // New connection
     if (msg->flags & connection_connected)
     {
-        exit_code = (int)GanglionLibNative::STATUS_OK;
-#ifdef DEBUG
-        std::cout << "connected" << std::endl;
-#endif
+        connection = msg->connection;
+        // this method is called from ble_evt_connection_disconnected after each connection timeout
+        // expiration, need to set exit code only when we call this methid from open_ble_device
+        if (state == State::initial_connection)
+        {
+            {
+                std::lock_guard<std::mutex> lk (m);
+                exit_code = (int)GanglionLibNative::STATUS_OK;
+            }
+            cv.notify_one ();
+        }
     }
 }
 
 void ble_evt_connection_disconnected (const struct ble_msg_connection_disconnected_evt_t *msg)
 {
+    // atempt to reconnect
     ble_cmd_gap_connect_direct (&connect_addr, gap_address_type_random, 40, 60, 100, 0);
-#ifdef DEBUG
-    std::cout << "reconnect" << std::endl;
-#endif
+}
+
+// ble_evt_attclient_group_found and ble_evt_attclient_procedure_completed are called after the same
+// command(ble_cmd_attclient_read_by_group_type)
+void ble_evt_attclient_group_found (const struct ble_msg_attclient_group_found_evt_t *msg)
+{
+    if (msg->uuid.len == 0)
+    {
+        return;
+    }
+    uint16 uuid = (msg->uuid.data[1] << 8) | msg->uuid.data[0];
+    if (uuid == GANGLION_SERVICE_UUID)
+    {
+        ganglion_handle_start = msg->start;
+        ganglion_handle_end = msg->end;
+    }
+}
+
+void ble_evt_attclient_procedure_completed (
+    const struct ble_msg_attclient_procedure_completed_evt_t *msg)
+{
+    if (state == State::open_called)
+    {
+        if ((ganglion_handle_start) && (ganglion_handle_end))
+        {
+            ble_cmd_attclient_find_information (msg->connection, ganglion_handle_start,
+                ganglion_handle_end); // triggers ble_evt_attclient_find_information_found
+        }
+    }
+}
+
+// finds characteristic handles and set exit_code for open_ganglion call
+void ble_evt_attclient_find_information_found (
+    const struct ble_msg_attclient_find_information_found_evt_t *msg)
+{
+    if (msg->uuid.len == 2)
+    {
+        uint16 uuid = (msg->uuid.data[1] << 8) | msg->uuid.data[0];
+        if (uuid == GANGLION_RECV_CHAR_UUID)
+        {
+            ganglion_handle_recv = msg->chrhandle;
+        }
+        else if (uuid == GANGLION_SEND_CHAR_UUID)
+        {
+            ganglion_handle_send = msg->chrhandle;
+        }
+    }
+    if ((ganglion_handle_send) && (ganglion_handle_recv))
+    {
+        {
+            std::lock_guard<std::mutex> lk (m);
+            exit_code = (int)GanglionLibNative::STATUS_OK;
+        }
+        cv.notify_one ();
+    }
 }

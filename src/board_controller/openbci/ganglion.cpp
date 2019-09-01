@@ -27,7 +27,7 @@ Ganglion::Ganglion (const char *port_name) : Board ()
     }
     else
     {
-        strcpy (this->mac_addr, port_name)
+        strcpy (this->mac_addr, port_name);
     }
     // get full path of ganglioblibnative with assumption that this lib is in the same folder
     char ganglionlib_dir[1024];
@@ -413,6 +413,15 @@ int Ganglion::call_init ()
         return GENERAL_ERROR;
     }
     int res = (func) (NULL);
+#ifndef _WIN32
+    if (res == (int)GanglionLibNative::GANGLION_DONGLE_PORT_IS_NOT_SET_ERROR)
+    {
+        Board::board_logger->error (
+            "you need to set {} env variable to dongle port e.g /dev/ttyACM0",
+            GANGLION_DONGLE_PORT);
+        return GANGLION_DONGLE_PORT_IS_NOT_SET_ERROR;
+    }
+#endif
     if (res != (int)GanglionLibNative::CustomExitCodesNative::STATUS_OK)
     {
         Board::board_logger->error ("failed to init GanglionLib {}", res);
