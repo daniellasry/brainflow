@@ -70,10 +70,19 @@ namespace GanglionLibNative
             // Reset dongle to get it into known state
             ble_cmd_system_reset (0);
             uart_close ();
-            do
+            int i;
+            for (i = 0; i < 5; i++)
             {
                 usleep (500000); // 0.5s
-            } while (uart_open (uart_port));
+                if (!uart_open (uart_port))
+                {
+                    break;
+                }
+            }
+            if (i == 5)
+            {
+                return (int)CustomExitCodesNative::PORT_OPEN_ERROR;
+            }
             initialized = true;
         }
         return (int)CustomExitCodesNative::STATUS_OK;
@@ -201,7 +210,7 @@ namespace GanglionLibNative
     {
         if (initialized)
         {
-            close_ganglion_native ();
+            close_ganglion_native (NULL);
             state = State::none;
             initialized = false;
             ble_cmd_system_reset (0);
