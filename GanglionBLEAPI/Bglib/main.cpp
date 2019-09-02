@@ -83,6 +83,9 @@ namespace GanglionLibNative
             {
                 return (int)CustomExitCodesNative::PORT_OPEN_ERROR;
             }
+            keep_alive = true;
+            read_message_thread = std::thread (read_message_worker);
+
             initialized = true;
         }
         return (int)CustomExitCodesNative::STATUS_OK;
@@ -90,14 +93,7 @@ namespace GanglionLibNative
 
     int open_ganglion_native (void *param)
     {
-        if (keep_alive)
-        {
-            return (int)CustomExitCodesNative::GANGLION_ALREADY_OPEN_ERROR;
-        }
         exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
-        keep_alive = true;
-        read_message_thread = std::thread (read_message_worker);
-
         state = State::open_called;
         ble_cmd_gap_discover (gap_discover_observation);
 
@@ -112,14 +108,7 @@ namespace GanglionLibNative
 
     int open_ganglion_mac_addr_native (void *param)
     {
-        if (keep_alive)
-        {
-            return (int)CustomExitCodesNative::GANGLION_ALREADY_OPEN_ERROR;
-        }
         exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
-        keep_alive = true;
-        read_message_thread = std::thread (read_message_worker);
-
         state = State::open_called;
         char *mac_addr = (char *)param;
         // convert string mac addr to bd_addr struct
@@ -162,12 +151,6 @@ namespace GanglionLibNative
         state = State::close_called;
 
         stop_stream_native (NULL);
-
-        keep_alive = false;
-        if (read_message_thread.joinable ())
-        {
-            read_message_thread.join ();
-        }
 
         connection = 0;
         ganglion_handle_start = 0;
@@ -214,6 +197,11 @@ namespace GanglionLibNative
             state = State::none;
             initialized = false;
             ble_cmd_system_reset (0);
+            keep_alive = false;
+            if (read_message_thread.joinable ())
+            {
+                read_message_thread.join ();
+            }
             uart_close ();
         }
         return (int)CustomExitCodesNative::STATUS_OK;
