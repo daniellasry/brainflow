@@ -18,6 +18,7 @@
 extern volatile int exit_code;
 extern volatile bd_addr connect_addr;
 extern volatile uint8 connection;
+extern char uart_port[1024];
 extern volatile State state;
 extern std::mutex m;
 extern std::condition_variable cv;
@@ -26,7 +27,7 @@ void output (uint8 len1, uint8 *data1, uint16 len2, uint8 *data2)
 {
     if (uart_tx (len1, data1) || uart_tx (len2, data2))
     {
-        exit_code = (int)GanglionLibNative::GANGLION_NOT_FOUND_ERROR;
+        exit_code = (int)GanglionLibNative::PORT_OPEN_ERROR;
     }
 }
 
@@ -112,4 +113,25 @@ int wait_for_callback (int num_sec)
     cv.wait_for (lk, num_sec * sec,
         [&exit_code] { return exit_code != (int)GanglionLibNative::SYNC_ERROR; });
     return exit_code;
+}
+
+int reset_ble_dev ()
+{
+    // Reset dongle to get it into known state
+    ble_cmd_system_reset (0);
+    uart_close ();
+    int i;
+    for (i = 0; i < 5; i++)
+    {
+        usleep (500000); // 0.5s
+        if (!uart_open (uart_port))
+        {
+            break;
+        }
+    }
+    if (i == 5)
+    {
+        return (int)GanglionLibNative::PORT_OPEN_ERROR;
+    }
+    return (int)GanglionLibNative::STATUS_OK;
 }

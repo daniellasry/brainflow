@@ -26,3 +26,4 @@ int read_message (int timeout_ms);
 std::string get_dongle_port ();
 int open_ble_dev ();
 int wait_for_callback (int num_sec);
+int reset_ble_dev ();

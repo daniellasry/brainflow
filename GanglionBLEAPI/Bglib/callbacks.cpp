@@ -11,7 +11,6 @@
 #include "helpers.h"
 #include "uart.h"
 
-#include <iostream>
 
 #define GANGLION_SERVICE_UUID 0xfe84
 // seems like in this api chars uuids are not the same as in microsoft api

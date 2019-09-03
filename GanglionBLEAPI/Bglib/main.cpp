@@ -12,8 +12,6 @@
 #include "helpers.h"
 #include "uart.h"
 
-#include <iostream>
-
 #include "GanglionNativeInterface.h"
 
 // read Bluetooth_Smart_Software_v1.3.1_API_Reference.pdf to understand at least smth here
@@ -45,6 +43,7 @@ void read_message_worker ()
 {
     while (keep_alive)
     {
+        // looks like it works wo mutex for reset_ble_dev and read_message
         read_message (UART_TIMEOUT);
     }
 }
@@ -67,21 +66,10 @@ namespace GanglionLibNative
             {
                 return (int)CustomExitCodesNative::GANGLION_NOT_FOUND_ERROR;
             }
-            // Reset dongle to get it into known state
-            ble_cmd_system_reset (0);
-            uart_close ();
-            int i;
-            for (i = 0; i < 5; i++)
+            int res = reset_ble_dev ();
+            if (res != (int)CustomExitCodesNative::STATUS_OK)
             {
-                usleep (500000); // 0.5s
-                if (!uart_open (uart_port))
-                {
-                    break;
-                }
-            }
-            if (i == 5)
-            {
-                return (int)CustomExitCodesNative::PORT_OPEN_ERROR;
+                return res;
             }
             keep_alive = true;
             read_message_thread = std::thread (read_message_worker);
@@ -93,11 +81,17 @@ namespace GanglionLibNative
 
     int open_ganglion_native (void *param)
     {
+        // without reset here open-close-open doesnt works I spent hours to figure it out
+        int res = reset_ble_dev ();
+        if (res != (int)CustomExitCodesNative::STATUS_OK)
+        {
+            return res;
+        }
         exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
         state = State::open_called;
         ble_cmd_gap_discover (gap_discover_observation);
 
-        int res = wait_for_callback (5);
+        res = wait_for_callback (5);
         if (res != (int)CustomExitCodesNative::STATUS_OK)
         {
             return res;
@@ -108,6 +102,12 @@ namespace GanglionLibNative
 
     int open_ganglion_mac_addr_native (void *param)
     {
+        // without reset here open-close-open doesnt works I spent hours to figure it out
+        int res = reset_ble_dev ();
+        if (res != (int)CustomExitCodesNative::STATUS_OK)
+        {
+            return res;
+        }
         exit_code = (int)CustomExitCodesNative::SYNC_ERROR;
         state = State::open_called;
         char *mac_addr = (char *)param;
