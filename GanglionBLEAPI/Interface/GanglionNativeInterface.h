@@ -5,13 +5,14 @@
 #define SHARED_EXPORT __declspec(dllexport)
 #else
 #define SHARED_EXPORT
+#define GANGLION_DONGLE_PORT "GANGLION_DONGLE_PORT"
 #endif
 
 #include <string.h>
 
 namespace GanglionLibNative
 {
-#pragma pack (push, 1)
+#pragma pack(push, 1)
     struct GanglionDataNative
     {
         unsigned char data[20];
@@ -30,7 +31,7 @@ namespace GanglionLibNative
             memcpy (data, other.data, sizeof (unsigned char) * 20);
         }
     };
-#pragma pack (pop)
+#pragma pack(pop)
 
     enum CustomExitCodesNative
     {
@@ -48,7 +49,12 @@ namespace GanglionLibNative
         FAILED_TO_SET_CALLBACK_ERROR,
         FAILED_TO_UNSUBSCRIBE_ERROR,
         GENERAL_ERROR,
-        NO_DATA_ERROR
+        NO_DATA_ERROR,
+        SYNC_ERROR,
+        NOT_IMPLEMENTED_ERROR,
+        INVALID_MAC_ADDR_ERROR,
+        PORT_OPEN_ERROR,
+        GANGLION_DONGLE_PORT_IS_NOT_SET_ERROR
     };
 
 #ifdef __cplusplus
@@ -62,6 +68,7 @@ namespace GanglionLibNative
         SHARED_EXPORT int close_ganglion_native (void *param);
         SHARED_EXPORT int get_data_native (void *param);
         SHARED_EXPORT int config_board_native (void *param);
+        SHARED_EXPORT int release_native (void *param);
     }
 #endif
 }

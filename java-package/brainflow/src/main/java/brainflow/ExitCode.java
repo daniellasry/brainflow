@@ -24,7 +24,8 @@ public enum ExitCode {
     BOARD_NOT_CREATED_ERROR (15),
     ANOTHER_BOARD_IS_CREATED_ERROR (16),
     GENERAL_ERROR (17),
-    SYNC_TIMEOUT_ERROR (18);
+    SYNC_TIMEOUT_ERROR (18),
+    GANGLION_DONGLE_PORT_IS_NOT_SET_ERROR (19);
 
  
     private final int exit_code;

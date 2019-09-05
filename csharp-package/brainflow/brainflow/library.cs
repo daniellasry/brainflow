@@ -22,7 +22,8 @@ namespace brainflow
         BOARD_NOT_CREATED_ERROR,
         ANOTHER_BOARD_IS_CREATED_ERROR,
         GENERAL_ERROR,
-        SYNC_TIMEOUT_ERROR
+        SYNC_TIMEOUT_ERROR,
+        GANGLION_DONGLE_PORT_IS_NOT_SET_ERROR
     };
 
     public enum BoardIds

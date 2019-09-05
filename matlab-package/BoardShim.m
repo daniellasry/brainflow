@@ -28,6 +28,7 @@ classdef BoardShim
             obj.exit_codes (16) = 'ANOTHER_BOARD_IS_CREATED_ERROR';
             obj.exit_codes (17) = 'GENERAL_ERROR';
             obj.exit_codes (18) = 'SYNC_TIMEOUT_ERROR';
+            obj.exit_codes (19) = 'GANGLION_DONGLE_PORT_IS_NOT_SET_ERROR';
             
             if ispc
                 obj.libname = 'BoardController';

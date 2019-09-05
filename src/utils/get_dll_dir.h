@@ -36,14 +36,17 @@ bool get_dll_path (char *res)
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <string.h>
+#include <string>
 
-// untested
+
 bool get_dll_path (char *res)
 {
     Dl_info dl_info;
     if (dladdr ((void *)get_dll_path, &dl_info))
     {
-        strcpy (res, dl_info.dli_fname);
+        std::string full_path = dl_info.dli_fname;
+        std::string dir_path = full_path.substr (0, full_path.find_last_of ("/") + 1);
+        strcpy (res, dir_path.c_str ());
         return true;
     }
     return false;

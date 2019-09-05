@@ -22,13 +22,6 @@ int check_board_session (std::pair<int, std::string> key);
 
 int prepare_session (int board_id, char *port_name)
 {
-
-#ifndef _WIN32
-    // temp stub for ganglion on linux and macos
-    if (board_id == GANGLION_BOARD)
-        return UNSUPPORTED_BOARD_ERROR;
-#endif
-
     std::lock_guard<std::mutex> lock (mutex);
 
     std::pair<int, std::string> key = get_key (board_id, port_name);
