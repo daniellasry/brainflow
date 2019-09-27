@@ -102,6 +102,7 @@ deploy_script:
       $lin = $false;
       $osx = $false;
       for ($i=0; $i -lt 30; $i++) {
+        # wait 30 minutes or until mac and linux binaries appear in s3
         aws s3 ls s3://brainflow-artifacts/$env:APPVEYOR_REPO_COMMIT/linux_success;
         $lin = $?;
         aws s3 ls s3://brainflow-artifacts/$env:APPVEYOR_REPO_COMMIT/osx_success;
