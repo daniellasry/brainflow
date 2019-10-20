@@ -108,6 +108,10 @@ after_success:
   # notify that everything is ok
   - echo success > ${TRAVIS_OS_NAME}_success && aws s3 cp ${TRAVIS_OS_NAME}_success s3://brainflow-artifacts/$TRAVIS_COMMIT/
 
+after_failure:
+  # notify Appveyor of travis test failure
+  echo failure > ${TRAVIS_OS_NAME}_failure && aws s3 cp ${TRAVIS_OS_NAME}_failure s3://brainflow-artifacts/$TRAVIS_COMMIT/
+
 notifications:
   email:
     on_success: never
