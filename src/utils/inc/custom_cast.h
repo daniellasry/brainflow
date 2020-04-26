@@ -62,10 +62,3 @@ template <unsigned int N> inline int32_t cast_ganglion_bits_to_int32 (unsigned c
 
     return result;
 }
-
-inline int32_t cast_ganglionaccel_16bit_to_int32 (unsigned char *byte_array)
-{
-    int prefix = 0;
-
-    return (prefix << 16) | (byte_array[0] << 8) | byte_array[1];
-}
